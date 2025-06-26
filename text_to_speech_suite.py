@@ -1,4 +1,5 @@
 import os
+import time
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
 
@@ -30,21 +31,19 @@ AUDIO_OUTPUT_FOLDER = "generated audio"
 
 ##############################################################################################################################
 ##############################################################################################################################
+##############################################################################################################################
 
-def main():
-    print("#######################################\n##### PDF to audio conversion CLI #####\n#######################################")
-
-    if 'pdf_path' not in locals():
-        path_completer = PathCompleter()
-        print("\n################################# How to Navigate #################################")
-        print("#                                                                             #")
-        print("# - Press TAB to see available files and folders.                             #")
-        print("# - Type part of a name and press TAB to autocomplete.                        #")
-        print("# - Use '../' to go up to the parent directory.                               #")
-        print("# - For WSL: your C: drive is at '/mnt/c/'.                                   #")
-        print("#                                                                             #")
-        print("#################################################################################\n")
-        pdf_path = prompt(">>> Enter the path to your PDF file: ", completer=path_completer)
+def process_pdf_workflow():
+    # Workflow for processing a PDF file
+    path_completer = PathCompleter()
+    print("\n################################# How to Navigate ###########################")
+    print("#                                                                             #")
+    print("# - Press TAB to see available files and folders.                             #")
+    print("# - Use '../' to go up to the parent directory.                               #")
+    print("# - For WSL: your C: drive is at '/mnt/c/'.                                   #")
+    print("#                                                                             #")
+    print("###############################################################################\n")
+    pdf_path = prompt(">>> Enter the path to your PDF file: ", completer=path_completer)
 
     if not os.path.exists(pdf_path):
         print(f"\n!!! Error: File does not exist at '{pdf_path}' !!!")
@@ -56,14 +55,9 @@ def main():
 
     save_text = input("\n>>> Do you want to save the cleaned text to a .txt file for review? (y/N): ").lower()
     if save_text == 'y':
-
         os.makedirs(TEXT_OUTPUT_FOLDER, exist_ok=True)
         base_name = os.path.splitext(os.path.basename(pdf_path))[0]
         text_filename_suggestion = os.path.join(TEXT_OUTPUT_FOLDER, f"{base_name}_textract.txt")
-        #base_dir = os.path.dirname(pdf_path)
-        #base_name = os.path.splitext(os.path.basename(pdf_path))[0]
-        #text_filename_suggestion = os.path.join(base_dir, f"{base_name}_textract.txt")
-        
         text_filepath = get_unique_filename(text_filename_suggestion)
     
         try:
@@ -71,13 +65,11 @@ def main():
                 f.write(clean_text)
             print(f"Cleaned text saved to '{text_filepath}'")
 
-            # Manual editing option for agregious issues, waits til user confirms readiness
             edit_text = input(">>> Do you want to open this file for manual editing? (y/N): ").lower()
             if edit_text == 'y':
                 open_file_for_editing(text_filepath)
                 input("\n>>> After you have finished editing and saved the file, press Enter here to continue...")
                 
-                # Re-read the potentially modified text file
                 print("Re-reading edited text file...")
                 with open(text_filepath, 'r', encoding='utf-8') as f:
                     clean_text = f.read()
@@ -86,14 +78,33 @@ def main():
         except Exception as e:
             print(f"!!! Error during file handling or editing: {e} !!!")
 
-    create_audio = input(">>> Do you want to proceed with generating the audio file? (y/N): ").lower()
-    if create_audio == 'y':
+    generate_audio_from_text(clean_text, pdf_path)
+
+def process_txt_workflow():
+    # Workflow for generating audio from a text (.txt) file
+    path_completer = PathCompleter()
+    txt_path = prompt(">>> Enter the path to your .txt file: ", completer=path_completer)
+
+    if not os.path.exists(txt_path):
+        print(f"\n!!! Error: File does not exist at '{txt_path}' !!!")
+        return
+
+    try:
+        print(f"Reading text from '{txt_path}'...")
+        with open(txt_path, 'r', encoding='utf-8') as f:
+            text_to_synthesize = f.read()
+        print("Text successfully loaded.")
+        generate_audio_from_text(text_to_synthesize, txt_path)
+    except Exception as e:
+        print(f"!!! Error reading text file: {e} !!!")
+
+def generate_audio_from_text(text_content, source_path):
+    # Method for prompting user and starting audio synthesis
+    create_audio = input("\n>>> Do you want to proceed with generating the audio file? (Y/n): ").lower()
+    if not create_audio or create_audio == 'y':
         os.makedirs(AUDIO_OUTPUT_FOLDER, exist_ok=True)
-        base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+        base_name = os.path.splitext(os.path.basename(source_path))[0]
         default_output_suggestion = os.path.join(AUDIO_OUTPUT_FOLDER, f"{base_name}.mp3")
-        #base_dir = os.path.dirname(pdf_path)
-        #base_name = os.path.splitext(os.path.basename(pdf_path))[0]
-        #default_output_suggestion = os.path.join(base_dir, f"{base_name}.mp3")
         
         unique_default_name = get_unique_filename(default_output_suggestion)
         
@@ -103,12 +114,37 @@ def main():
 
         output_filename = get_unique_filename(output_filename)
 
-        text_to_speech_converter(clean_text, output_filename, TTS_CHUNK_SIZE, MAX_RETRIES, INITIAL_BACKOFF)
+        text_to_speech_converter(text_content, output_filename, TTS_CHUNK_SIZE, MAX_RETRIES, INITIAL_BACKOFF)
     else:
-        print("Skipping audio generation. Exiting.")
+        print("Skipping audio generation.")
+
+##############################################################################################################################
+################################################### Main Execution ###########################################################
+##############################################################################################################################
+
+def main():
+    print("#######################################\n##### PDF to audio conversion CLI #####\n#######################################")
+    
+    while True:
+        print("\nPlease choose an option:")
+        print("1: Process a new PDF file")
+        print("2: Generate audio from an existing .txt file")
+        print("Q: Quit")
+        
+        choice = input(">>> Your choice: ").lower()
+        
+        if choice == '1':
+            process_pdf_workflow()
+            break
+        elif choice == '2':
+            process_txt_workflow()
+            break
+        elif choice == 'q':
+            break
+        else:
+            print("\n!!! Invalid choice, please try again. !!!")
 
     print("\nScript finished.")
-
 
 if __name__ == "__main__":
     main()

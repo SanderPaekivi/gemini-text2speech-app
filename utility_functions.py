@@ -26,7 +26,9 @@ def open_file_for_editing(filepath):
             os.startfile(filepath)
         elif is_wsl:
             # In WSL, use windows to open file, not VIM
-            subprocess.call(['explorer.exe', filepath])
+            absolute_wsl_path = os.path.abspath(filepath)
+            windows_path = subprocess.check_output(['wslpath', '-w', absolute_wsl_path]).strip().decode('utf-8')
+            subprocess.call(['explorer.exe', windows_path])
         elif sys.platform == "darwin": # macOS
             subprocess.call(["open", filepath])
         else: # Linux, WSL, etc.

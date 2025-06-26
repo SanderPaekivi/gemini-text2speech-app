@@ -78,10 +78,10 @@ def extract_and_clean_pdf_text(pdf_path):
     # Global text cleanup
     full_text = "\n".join(full_text_parts)
     
-    match = re.search(r'^\s*(Acknowledgments?|References)\s*$', full_text, re.MULTILINE | re.IGNORECASE) #TODO: Make this more robust, check for applicability issues (multiple papers in row in pdf?)
-    if match:
-        print("Found References/Acknowledgments section. Truncating text.")
-        full_text = full_text[:match.start()]
+    # match = re.search(r'^\s*(Acknowledgments?|References)\s*$', full_text, re.MULTILINE | re.IGNORECASE) #TODO: Make this more robust, check for applicability issues (multiple papers in row in pdf?)
+    # if match:
+    #     print("Found References/Acknowledgments section. Truncating text.")
+    #     full_text = full_text[:match.start()]
     
     # Joining words separated by newline only if they have hyphen in middle
     text = re.sub(r'([a-zA-Z]+)-\n', r'\1', full_text)
