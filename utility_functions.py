@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import glob
 import platform
 import subprocess
 
@@ -40,3 +41,27 @@ def open_file_for_editing(filepath):
 def reduce_text_numerics(text):
     # Replaces all digits in a string with a placeholder for pattern matching
     return re.sub(r'\d+', '_NUM_', text)
+
+def stitch_and_save_partial_audio(temp_dir_path, original_output_filename):
+    # Method for when voice generation fails - finds existing chunks and stitches them into a partial audio file, if requested
+    print("\n--- Attempting to save partial audio ---")
+    chunk_files = sorted(glob.glob(os.path.join(temp_dir_path, "chunk_*.mp3")))
+    
+    if not chunk_files:
+        print("No completed chunks found to save.")
+        return
+
+    num_chunks_saved = len(chunk_files)
+    print(f"Found {num_chunks_saved} completed chunks.")
+    
+    # Create a new name for the partial file to avoid confusion
+    base, ext = os.path.splitext(original_output_filename)
+    partial_filename = f"{base}_partial_to_chunk_{num_chunks_saved}{ext}"
+    
+    print(f"Combining chunks into '{partial_filename}'...")
+    with open(partial_filename, "wb") as out_file:
+        for chunk_file in chunk_files:
+            with open(chunk_file, "rb") as in_chunk:
+                out_file.write(in_chunk.read())
+    
+    print(f"Partial audiobook saved successfully as '{partial_filename}'")

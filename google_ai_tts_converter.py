@@ -6,6 +6,8 @@ from tqdm import tqdm
 from google.cloud import texttospeech
 from google.api_core import exceptions as google_exceptions
 
+from utility_functions import stitch_and_save_partial_audio
+
 def text_to_speech_converter(text, output_filename, TTS_CHUNK_SIZE=4500, MAX_RETRIES=5, INITIAL_BACKOFF=2):
     # Chunks text to max chunk size (per specs, see documentation) and uses Google Cloud TTS to generate an audio file (includes retry mechanism for server side errors)
     print("\n --- Synthesizing Audio --- ")
@@ -28,7 +30,7 @@ def text_to_speech_converter(text, output_filename, TTS_CHUNK_SIZE=4500, MAX_RET
     print(f"Text split into {len(text_chunks)} chunks for audio synthesis.")
     
     for index_of_chunk, chunk in enumerate(tqdm(text_chunks, desc="Synthesizing audio...")):
-        # Define the path for this specific chunk's audio file
+        # Define the path for this specific chunk audio file
         chunk_filename = os.path.join(temp_dir_path, f"chunk_{index_of_chunk:04d}.mp3")
         
         # If the chunk file already exists, skip the API call
@@ -70,12 +72,18 @@ def text_to_speech_converter(text, output_filename, TTS_CHUNK_SIZE=4500, MAX_RET
             
             except Exception as e:
                 print(f"\n!!! An unrecoverable error occurred on chunk {index_of_chunk+1}: {e} !!!")
+                save_partial = input("\n>>> Would you like to save the audio processed so far? (y/N): ").lower()
+                if save_partial == 'y':
+                    stitch_and_save_partial_audio(temp_dir_path, output_filename)
                 print("Aborting synthesis. Run the script again with the same output filename to resume.")
                 return
 
         # Check if this specific chunk failed after all retries
         if not os.path.exists(chunk_filename):
             print(f"\n!!! Failed to process chunk {index_of_chunk+1} after multiple retries. Aborting. !!!")
+            save_partial = input("\n>>> Would you like to save the audio processed so far? (y/N): ").lower()
+            if save_partial == 'y':
+                stitch_and_save_partial_audio(temp_dir_path, output_filename)
             print("Run the script again with the same output filename to resume.")
             return
 
