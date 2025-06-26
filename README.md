@@ -55,6 +55,8 @@ or
 
 ```python3 text_to_speech_suite.py```
 
-The script will guide you through the rest of the process.
+The script will guide you through the rest of the process. 
+
+NB: The textractor creates a simple .txt file with the core text in one row. After extracting core text, the app will ask if you want to review it. If yes, then it should open up the file in a notepad or something relevant to your op-system. You can edit the text there, usually the start and end of the file are not great with title pages and citation pages. The app is on standby til you tell it to continue, so it will work with the manually edited .txt file after you save the edits and continue! 
 
 
