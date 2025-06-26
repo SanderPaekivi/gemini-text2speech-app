@@ -83,6 +83,13 @@ def process_pdf_workflow():
 def process_txt_workflow():
     # Workflow for generating audio from a text (.txt) file
     path_completer = PathCompleter()
+    print("\n################################# How to Navigate ###########################")
+    print("#                                                                             #")
+    print("# - Press TAB to see available files and folders.                             #")
+    print("# - Use '../' to go up to the parent directory.                               #")
+    print("# - For WSL: your C: drive is at '/mnt/c/'.                                   #")
+    print("#                                                                             #")
+    print("###############################################################################\n")
     txt_path = prompt(">>> Enter the path to your .txt file: ", completer=path_completer)
 
     if not os.path.exists(txt_path):
