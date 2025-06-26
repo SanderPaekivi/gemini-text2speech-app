@@ -16,8 +16,7 @@ Currently the AI voice in use is from Chirp 3 HD, Aoede, but might update to hav
 
 Follow these steps to get the tool running on your local machine.
 
-1. Clone the RepositoryOpen your terminal and clone this project from GitHub:git clone <your-repo-url>
-cd <your-repo-folder>
+1. Clone the RepositoryOpen your terminal and clone this project from GitHub
 2. Install Dependencies (recommend to use a Python virtual environment to keep your project dependencies isolated)
    * Create a virtual environment
      ```python3 -m venv venv```
