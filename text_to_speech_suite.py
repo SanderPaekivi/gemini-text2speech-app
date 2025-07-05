@@ -1,33 +1,12 @@
 import os
-import time
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
 
-from utility_functions import get_unique_filename, open_file_for_editing
+from config import * 
+from utility_functions import get_unique_filename, open_file_for_editing, calculate_tts_cost
 from pdf_core_text_extractor import extract_and_clean_pdf_text
 from google_ai_tts_converter import text_to_speech_converter
 
-##############################################################################################################################
-##################################################### Configuration ##########################################################
-##############################################################################################################################
-
-# Set up authentication for the Google Cloud Text-to-Speech service
-CREDENTIALS_FILE = "google-credentials.json"
-if os.path.exists(CREDENTIALS_FILE):
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = CREDENTIALS_FILE
-else:
-    print(f"Authentication Error: '{CREDENTIALS_FILE}' not found.")
-    print("Please download your service account key from Google Cloud and save it in the project folder. It is gitignored!")
-    exit()
-
-# Maximum characters a single API request to Google TTS can be (TODO: Check validity and options)
-TTS_CHUNK_SIZE = 4500
-# For retry-mechanism, had some server-side errors before... (TODO: Perhaps remove)
-MAX_RETRIES = 5
-INITIAL_BACKOFF = 2  # unit in seconds
-
-TEXT_OUTPUT_FOLDER = "extracted texts" #NOTE: Changing these folder names will make them visible to git, so be careful!
-AUDIO_OUTPUT_FOLDER = "generated audio"
 
 ##############################################################################################################################
 ##############################################################################################################################
@@ -83,9 +62,10 @@ def process_pdf_workflow():
 def process_txt_workflow():
     # Workflow for generating audio from a text (.txt) file
     path_completer = PathCompleter()
-    print("\n################################# How to Navigate ###########################")
+    print("\n######################### How to Navigate #####################################")
     print("#                                                                             #")
     print("# - Press TAB to see available files and folders.                             #")
+    print("# - Use '/' to select a directory and see internal content.                   #")
     print("# - Use '../' to go up to the parent directory.                               #")
     print("# - For WSL: your C: drive is at '/mnt/c/'.                                   #")
     print("#                                                                             #")
@@ -107,6 +87,22 @@ def process_txt_workflow():
 
 def generate_audio_from_text(text_content, source_path):
     # Method for prompting user and starting audio synthesis
+    char_count = len(text_content)
+    estimated_cost = calculate_tts_cost(char_count, PRICE_PER_MILLION_CHARS_HD)
+
+    print("\n###############################################################")
+    print("#                        Cost Estimation")
+    print(f"# Total characters in given text to synthesize: {char_count}")
+    print(f"# Estimated cost: ${estimated_cost:.4f}")
+    print("#")
+    print("#                      IMPORTANT")
+    print(f"# Your Google Cloud account includes a free tier of")
+    print(f"# {FREE_TIER_LIMIT:,} characters per month for HD voices.")
+    print("# This estimate does NOT account for your remaining free tier!")
+    print("# To check your current usage, visit your")
+    print("# Google Cloud Console Billing page.")
+    print("###############################################################")
+
     create_audio = input("\n>>> Do you want to proceed with generating the audio file? (Y/n): ").lower()
     if not create_audio or create_audio == 'y':
         os.makedirs(AUDIO_OUTPUT_FOLDER, exist_ok=True)
@@ -121,7 +117,7 @@ def generate_audio_from_text(text_content, source_path):
 
         output_filename = get_unique_filename(output_filename)
 
-        text_to_speech_converter(text_content, output_filename, TTS_CHUNK_SIZE, MAX_RETRIES, INITIAL_BACKOFF)
+        text_to_speech_converter(text_content, output_filename, PRICE_PER_MILLION_CHARS_HD, TTS_CHUNK_SIZE, MAX_RETRIES, INITIAL_BACKOFF)
     else:
         print("Skipping audio generation.")
 

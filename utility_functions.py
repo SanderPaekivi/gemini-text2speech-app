@@ -65,3 +65,7 @@ def stitch_and_save_partial_audio(temp_dir_path, original_output_filename):
                 out_file.write(in_chunk.read())
     
     print(f"Partial audiobook saved successfully as '{partial_filename}'")
+
+def calculate_tts_cost(character_count, price_per_million_chars):
+    # Calculates the estimated cost for a given number of characters
+    return (character_count / 1_000_000) * price_per_million_chars

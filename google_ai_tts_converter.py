@@ -6,9 +6,9 @@ from tqdm import tqdm
 from google.cloud import texttospeech
 from google.api_core import exceptions as google_exceptions
 
-from utility_functions import stitch_and_save_partial_audio
+from utility_functions import stitch_and_save_partial_audio, calculate_tts_cost
 
-def text_to_speech_converter(text, output_filename, TTS_CHUNK_SIZE=4500, MAX_RETRIES=5, INITIAL_BACKOFF=2):
+def text_to_speech_converter(text, output_filename, price_per_million, TTS_CHUNK_SIZE=4500, MAX_RETRIES=5, INITIAL_BACKOFF=2):
     # Chunks text to max chunk size (per specs, see documentation) and uses Google Cloud TTS to generate an audio file (includes retry mechanism for server side errors)
     print("\n --- Synthesizing Audio --- ")
     if not text:
@@ -29,39 +29,44 @@ def text_to_speech_converter(text, output_filename, TTS_CHUNK_SIZE=4500, MAX_RET
     text_chunks = [text[i:i + TTS_CHUNK_SIZE] for i in range(0, len(text), TTS_CHUNK_SIZE)]
     print(f"Text split into {len(text_chunks)} chunks for audio synthesis.")
     
+    processed_chars = 0
     for index_of_chunk, chunk in enumerate(tqdm(text_chunks, desc="Synthesizing audio...")):
         # Define the path for this specific chunk audio file
         chunk_filename = os.path.join(temp_dir_path, f"chunk_{index_of_chunk:04d}.mp3")
-        
         # If the chunk file already exists, skip the API call
         if os.path.exists(chunk_filename):
+            processed_chars += len(chunk)
+            cost = calculate_tts_cost(processed_chars, price_per_million)
             tqdm.write(f"\n[Chunk {index_of_chunk+1}/{len(text_chunks)}] Found existing chunk file. Skipping API call.")
+            tqdm.write(f"--> Cumulative Characters: {processed_chars}, Estimated Cost so far: ${cost:.4f}")
             continue
-            
+
         retries = 0
         backoff_time = INITIAL_BACKOFF
-        
         while retries < MAX_RETRIES:
             try:
                 synthesis_input = texttospeech.SynthesisInput(text=chunk)
                 voice = texttospeech.VoiceSelectionParams(language_code="en-US", name="en-US-Chirp3-HD-Aoede")
                 audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
-                
+
                 if retries == 0:
                     tqdm.write(f"\n[Chunk {index_of_chunk+1}/{len(text_chunks)}] Requesting voice: {voice.name}...")
-                
+
                 response = tts_client.synthesize_speech(
-                    input=synthesis_input, 
-                    voice=voice, 
+                    input=synthesis_input,
+                    voice=voice,
                     audio_config=audio_config,
                     timeout=120.0
                 )
-                
                 # Save the successful chunk immediately
                 with open(chunk_filename, "wb") as out:
                     out.write(response.audio_content)
+
+                processed_chars += len(chunk)
+                cost = calculate_tts_cost(processed_chars, price_per_million)
+                tqdm.write(f"--> Cumulative Characters: {processed_chars}, Estimated Cost so far: ${cost:.4f}")
                 
-                break # Success, exit the retry loop
+                break  # Success, exit the retry loop
 
             except (google_exceptions.ServiceUnavailable, google_exceptions.DeadlineExceeded) as e:
                 error_type = "Server error" if isinstance(e, google_exceptions.ServiceUnavailable) else "Timeout (Deadline Exceeded)"
