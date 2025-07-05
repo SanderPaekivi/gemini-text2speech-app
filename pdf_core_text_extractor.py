@@ -84,7 +84,8 @@ def extract_and_clean_pdf_text(pdf_path):
     #     full_text = full_text[:match.start()]
     
     # Joining words separated by newline only if they have hyphen in middle
-    text = re.sub(r'([a-zA-Z]+)-\n', r'\1', full_text)
+    #text = re.sub(r'([a-zA-Z]+)-\n', r'\1', full_text)
+    text = re.sub(r'([a-zA-Z]+)-\s*\n\s*', r'\1', full_text)
     # Replacing remaining newlines with spaces
     text = text.replace('\n', ' ')
 
