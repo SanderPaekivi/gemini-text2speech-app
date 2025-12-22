@@ -28,8 +28,14 @@ def process_ai_extraction_workflow():
         start_page_index = int(start_page_input) - 1
     else:
         start_page_index = 0
-    # Call the new script
-    clean_text = extract_text_with_gemini(pdf_path, start_page_index=start_page_index)
+    
+    end_input = input(">>> End at Page number (default: End of file): ").strip()
+    end_page_index = None # None means to end
+    
+    if end_input.isdigit() and int(end_input) > 0:
+        end_page_index = int(end_input)
+    
+    clean_text = extract_text_with_gemini(pdf_path, start_page_index, end_page_index)
     # clean_text = extract_text_with_gemini(pdf_path)
 
     if clean_text:

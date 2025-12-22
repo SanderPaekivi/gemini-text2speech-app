@@ -15,7 +15,7 @@ except ImportError:
 
 ai_model = 'gemini-2.5-pro' #'gemini-2.0-flash'
 
-def extract_text_with_gemini(pdf_path, start_page_index=0):
+def extract_text_with_gemini(pdf_path, start_page_index=0, end_page_index=None):
     api_key = GEMINI_API_KEY
     if not api_key:
         print("!!! Error: GOOGLE_API_KEY not found. !!!")
@@ -50,7 +50,19 @@ def extract_text_with_gemini(pdf_path, start_page_index=0):
     
     doc = pymupdf.open(pdf_path)
     total_pages = len(doc)
-    print(f"Total Pages: {total_pages}")
+
+    if end_page_index is None or end_page_index > total_pages:
+        actual_end_index = total_pages
+    else:
+        actual_end_index = end_page_index
+
+    if start_page_index >= actual_end_index:
+        print(f"!!! Error: Start page ({start_page_index+1}) is after End page ({actual_end_index}).")
+        return None
+    
+    print(f"Processing '{filename_base}'")
+    print(f"Range: Page {start_page_index + 1} to Page {actual_end_index}")
+    print(f"Total pages to process: {actual_end_index - start_page_index}")
     
     full_book_text = []
     previous_anchor_text = None
@@ -63,61 +75,38 @@ def extract_text_with_gemini(pdf_path, start_page_index=0):
 
         batch_num = 1
         
-        for start_page in range(start_page_index, total_pages, step_size):
-            end_page = min(start_page + CHUNK_SIZE, total_pages)
+        for current_start in range(start_page_index, actual_end_index, step_size):
+            current_end = min(current_start + CHUNK_SIZE, actual_end_index)
             
-            # Stop if past the end
-            if start_page >= total_pages:
-                break
-
-            # create chunk PDF
+            # chunk PDF
             chunk_filename = os.path.join(temp_split_dir, f"batch_{batch_num:03d}.pdf")
             new_doc = pymupdf.open()
-            new_doc.insert_pdf(doc, from_page=start_page, to_page=end_page - 1)
+            
+            # insert_pdf: from_page is inclusive, to_page is inclusive
+            # want indices [current_start ... current_end - 1]
+            new_doc.insert_pdf(doc, from_page=current_start, to_page=current_end - 1)
             new_doc.save(chunk_filename)
             new_doc.close()
 
-            print(f"\nBatch {batch_num} (Pages {start_page+1}-{end_page})...")
-
+            print(f"\nBatch {batch_num} (Pages {current_start+1}-{current_end})...")
+            
+            # Extract
             batch_text = _process_single_chunk_anchor(client, chunk_filename, previous_anchor_text)
             
-            # # determine if this is the first batch (doesnt have overlap context)
-            # has_overlap_context = (start_page > 0)
-            
-            # # extract
-            # batch_text = _process_single_chunk(client, chunk_filename, has_overlap_context)
-            
-            # if batch_text:
-            #     batch_save_path = os.path.join(batch_output_dir, f"batch_{batch_num:03d}.txt")
-            #     with open(batch_save_path, "w", encoding="utf-8") as f:
-            #         f.write(batch_text)
-                
-            #     # full_book_text.append(batch_text)
-            #     # print(f"  -> Saved to {batch_save_path}")
-            #     print(f"  -> Stitching batch {batch_num}...", end=" ")
-            #     full_book_text = smart_stitch(full_book_text, batch_text)
-            # else:
-            #     print(f"!!! Warning: Batch {batch_num} returned no text.")
-
-            # batch_num += 1
-
             if batch_text:
                 batch_save_path = os.path.join(batch_output_dir, f"batch_{batch_num:03d}.txt")
                 with open(batch_save_path, "w", encoding="utf-8") as f:
                     f.write(batch_text)
                 
-                # Append directly, no stitching needed if AI obeys the anchor...
                 full_book_text.append(batch_text)
                 print(f"  -> Extracted {len(batch_text)} chars.")
                 
-                # New anchor method
-                # Grab the last ~300 characters (approx 2-3 sentences)
-                # strip whitespace to make matching easier
+                # Update Anchor (last ~300 chars)
                 clean_batch = batch_text.strip()
                 if len(clean_batch) > 300:
                     previous_anchor_text = clean_batch[-300:]
                 else:
-                    previous_anchor_text = clean_batch # fallback for tiny batches
+                    previous_anchor_text = clean_batch 
             else:
                 print(f"!!! Warning: Batch {batch_num} returned no text.")
                 # Keep the old anchor if this batch failed, or set to None?

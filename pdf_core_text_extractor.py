@@ -5,9 +5,9 @@ from collections import defaultdict
 
 from utility_functions import reduce_text_numerics
 
-def extract_and_clean_pdf_text(pdf_path):
+def extract_and_clean_pdf_text(pdf_path, start_page_index=0, end_page_index=None):
     # Core text extraction and cleaning logic 
-    print(f"\n --- Starting analysis of '{pdf_path}' ---")
+    print(f"\n Starting analysis of '{pdf_path}'.")
     try:
         doc = pymupdf.open(pdf_path)
     except FileNotFoundError:
@@ -16,12 +16,24 @@ def extract_and_clean_pdf_text(pdf_path):
     except Exception as e:
         print(f"!!! An error occurred while opening the PDF: {e} !!!")
         return None
+    
+    total_pages = len(doc)
+    if end_page_index is None or end_page_index > total_pages:
+        actual_end_index = total_pages
+    else:
+        actual_end_index = end_page_index
+    if start_page_index >= actual_end_index:
+        print(f"!!! Error: Start page ({start_page_index+1}) is after End page ({actual_end_index}).")
+        return None
+    print(f"Processing range: Page {start_page_index + 1} to Page {actual_end_index}")
 
     # First loop: collecting potential headers and footers
     header_counts = defaultdict(int)
     footer_counts = defaultdict(int)
     print("Identifying potential headers and footers...")
-    for page in tqdm(doc, desc="Analyzing page structure"):
+    # for page in tqdm(doc, desc="Analyzing page structure"):
+    for page_num in tqdm(range(start_page_index, actual_end_index), desc="Analyzing page structure"):
+        page = doc[page_num]
         # Ordering blocks based on height on page
         blocks = sorted(page.get_text("blocks"), key=lambda b: (b[1], b[0]))
         if not blocks:
@@ -57,8 +69,11 @@ def extract_and_clean_pdf_text(pdf_path):
     skippable_keywords = ['pp.', 'E-mail:', 'doi:'] # Keywords to skip in text extraction, add more as necessary
     
     print("Extracting main content...")
-    for page in tqdm(doc, desc="Extracting clean text"):
+    # for page in tqdm(doc, desc="Extracting clean text"):
+    for page_num in tqdm(range(start_page_index, actual_end_index), desc="Extracting clean text"):
+        page = doc[page_num]
         blocks = sorted(page.get_text("blocks"), key=lambda b: (b[1], b[0]))
+        
         for index, block in enumerate(blocks):
             block_text = block[4]
             stripped_block_text = block_text.strip()
