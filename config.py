@@ -5,6 +5,9 @@ load_dotenv()
 
 # Authentication and Secrets
 # NOTE: Swap to credentials file or .env file?
+
+GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
+
 CREDENTIALS_FILE = "google-credentials.json"
 
 # Set up authentication for the Google Cloud Text-to-Speech service
@@ -30,5 +33,5 @@ MAX_RETRIES = 5
 INITIAL_BACKOFF = 2  # unit in seconds
 
 # File Paths
-TEXT_OUTPUT_FOLDER = "extracted texts"
-AUDIO_OUTPUT_FOLDER = "generated audio"
+TEXT_OUTPUT_FOLDER = "extracted_texts"
+AUDIO_OUTPUT_FOLDER = "generated_audio"

@@ -6,11 +6,37 @@ from config import *
 from utility_functions import get_unique_filename, open_file_for_editing, calculate_tts_cost
 from pdf_core_text_extractor import extract_and_clean_pdf_text
 from google_ai_tts_converter import text_to_speech_converter
+from pdf_AI_text_extractor import extract_text_with_gemini
+from text_postprocessing import clean_extracted_text
+from gemini_ai_text_postprocessor import fix_text_with_ai
 
+##############################################################################################################################
+##############################################################################################################################
+##############################################################################################################################
 
-##############################################################################################################################
-##############################################################################################################################
-##############################################################################################################################
+def process_ai_extraction_workflow():
+    path_completer = PathCompleter()
+    print("\n--- AI SMART EXTRACTION (Gemini) ---")
+    pdf_path = prompt(">>> Enter path to PDF: ", completer=path_completer)
+
+    if not os.path.exists(pdf_path):
+        print("!!! File not found.")
+        return
+
+    # Call the new script
+    clean_text = extract_text_with_gemini(pdf_path)
+
+    if clean_text:
+        os.makedirs(TEXT_OUTPUT_FOLDER, exist_ok=True)
+        base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+        output_path = get_unique_filename(os.path.join(TEXT_OUTPUT_FOLDER, f"{base_name}_AI_extracted.txt"))
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(clean_text)
+
+        print(f"\nSUCCESS: AI Text saved to: '{output_path}'")
+        if input(">>> Open for review? (y/N): ").lower() == 'y':
+            open_file_for_editing(output_path)
 
 def process_pdf_workflow():
     # Workflow for processing a PDF file
@@ -58,6 +84,33 @@ def process_pdf_workflow():
             print(f"!!! Error during file handling or editing: {e} !!!")
 
     generate_audio_from_text(clean_text, pdf_path)
+
+def extract_pdf_only_workflow():
+    # Ask for PDF
+    path_completer = PathCompleter()
+    pdf_path = prompt(">>> Enter the path to your PDF file: ", completer=path_completer)
+    if not os.path.exists(pdf_path):
+        print(f"!!! Error: File not found at {pdf_path}")
+        return
+
+    # Extract
+    clean_text = extract_and_clean_pdf_text(pdf_path)
+    if not clean_text: 
+        return
+
+    # Save txt
+    os.makedirs(TEXT_OUTPUT_FOLDER, exist_ok=True)
+    base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+    text_filepath = get_unique_filename(os.path.join(TEXT_OUTPUT_FOLDER, f"{base_name}_textract.txt"))
+    
+    with open(text_filepath, 'w', encoding='utf-8') as f:
+        f.write(clean_text)
+    
+    print(f"\nSUCCESS: Text saved to '{text_filepath}'")
+    
+    # Option to open for edit
+    if input(">>> Open file for review/editing now? (y/N): ").lower() == 'y':
+        open_file_for_editing(text_filepath)
 
 def process_txt_workflow():
     # Workflow for generating audio from a text (.txt) file
@@ -127,21 +180,33 @@ def generate_audio_from_text(text_content, source_path):
 
 def main():
     print("#######################################\n##### PDF to audio conversion CLI #####\n#######################################")
-    
+    path_completer = PathCompleter()
     while True:
         print("\nPlease choose an option:")
         print("1: Process a new PDF file")
-        print("2: Generate audio from an existing .txt file")
+        print("2: AI Smart Extraction from PDF (Gemini)")
+        print("3: Generate audio from an existing .txt file")
+        print("4: Apply Regex Cleanup to a text file")
+        print("5: Apply AI Repair to txt (Gemini)")
         print("Q: Quit")
         
         choice = input(">>> Your choice: ").lower()
         
         if choice == '1':
-            process_pdf_workflow()
+            extract_pdf_only_workflow()
             break
         elif choice == '2':
+            process_ai_extraction_workflow()
+            break
+        elif choice == '3':
             process_txt_workflow()
             break
+        elif choice == '4':
+            txt_path = prompt(">>> Enter path to .txt file: ", completer=path_completer)
+            clean_extracted_text(txt_path)
+        elif choice == '5':
+            txt_path = prompt(">>> Enter path to .txt file: ", completer=path_completer)
+            fix_text_with_ai(txt_path)
         elif choice == 'q':
             break
         else:

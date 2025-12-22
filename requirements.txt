@@ -2,3 +2,5 @@ PyMuPDF
 google-cloud-texttospeech
 prompt-toolkit
 tqdm
+dotenv
+google-genai

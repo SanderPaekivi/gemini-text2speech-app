@@ -10,15 +10,33 @@ from utility_functions import stitch_and_save_partial_audio, calculate_tts_cost
 
 def text_to_speech_converter(text, output_filename, price_per_million, TTS_CHUNK_SIZE=4500, MAX_RETRIES=5, INITIAL_BACKOFF=2):
     # Chunks text to max chunk size (per specs, see documentation) and uses Google Cloud TTS to generate an audio file (includes retry mechanism for server side errors)
-    print("\n --- Synthesizing Audio --- ")
+    print("\n Synthesizing Audio")
     if not text:
         print("No text to synthesize. Aborting.")
         return
     
     temp_dir_name = os.path.splitext(os.path.basename(output_filename))[0] + "_temp_chunks"
     temp_dir_path = os.path.join(os.path.dirname(output_filename), temp_dir_name)
-    os.makedirs(temp_dir_path, exist_ok=True)
-    print(f"Chunks will be temporarily stored in: '{temp_dir_path}'")
+    
+    if os.path.exists(temp_dir_path):
+        print(f"\nFound existing temporary data at: {temp_dir_path}")
+        decision = input(">>> Resume from existing chunks (r) or Delete and restart (d)? (r/D): ").lower()
+        
+        if decision == 'd' or decision == '':
+            try:
+                shutil.rmtree(temp_dir_path)
+                os.makedirs(temp_dir_path, exist_ok=True)
+                print("Temporary directory cleared for fresh start.")
+            except Exception as e:
+                print(f"Error clearing directory: {e}")
+                return
+        else:
+            print("Resuming from existing chunks...")
+    else:
+        os.makedirs(temp_dir_path, exist_ok=True)
+    
+    # os.makedirs(temp_dir_path, exist_ok=True)
+    # print(f"Chunks will be temporarily stored in: '{temp_dir_path}'")
         
     try:
         tts_client = texttospeech.TextToSpeechClient()
@@ -30,6 +48,7 @@ def text_to_speech_converter(text, output_filename, price_per_million, TTS_CHUNK
     print(f"Text split into {len(text_chunks)} chunks for audio synthesis.")
     
     processed_chars = 0
+    
     for index_of_chunk, chunk in enumerate(tqdm(text_chunks, desc="Synthesizing audio...")):
         # Define the path for this specific chunk audio file
         chunk_filename = os.path.join(temp_dir_path, f"chunk_{index_of_chunk:04d}.mp3")
@@ -97,6 +116,10 @@ def text_to_speech_converter(text, output_filename, price_per_million, TTS_CHUNK
     
     # Find all chunk files in the temporary directory and sort them
     chunk_files = sorted(glob.glob(os.path.join(temp_dir_path, "chunk_*.mp3")))
+    if len(chunk_files) != len(text_chunks):
+        print(f"!!! Warning: Expected {len(text_chunks)} chunks but found {len(chunk_files)} on disk.")
+        if input("Proceed anyway? (y/N) ").lower() != 'y':
+            return
 
     with open(output_filename, "wb") as out_file:
         for chunk_file in chunk_files:
