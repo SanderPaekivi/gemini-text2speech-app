@@ -16,15 +16,21 @@ from gemini_ai_text_postprocessor import fix_text_with_ai
 
 def process_ai_extraction_workflow():
     path_completer = PathCompleter()
-    print("\n--- AI SMART EXTRACTION (Gemini) ---")
+    print("\n AI Text Extraction  (Gemini) ---")
     pdf_path = prompt(">>> Enter path to PDF: ", completer=path_completer)
 
     if not os.path.exists(pdf_path):
         print("!!! File not found.")
         return
 
+    start_page_input = input(">>> Start from Page number (default 1): ").strip()
+    if start_page_input.isdigit() and int(start_page_input) > 0:
+        start_page_index = int(start_page_input) - 1
+    else:
+        start_page_index = 0
     # Call the new script
-    clean_text = extract_text_with_gemini(pdf_path)
+    clean_text = extract_text_with_gemini(pdf_path, start_page_index=start_page_index)
+    # clean_text = extract_text_with_gemini(pdf_path)
 
     if clean_text:
         os.makedirs(TEXT_OUTPUT_FOLDER, exist_ok=True)
@@ -186,8 +192,8 @@ def main():
         print("1: Process a new PDF file")
         print("2: AI Smart Extraction from PDF (Gemini)")
         print("3: Generate audio from an existing .txt file")
-        print("4: Apply Regex Cleanup to a text file")
-        print("5: Apply AI Repair to txt (Gemini)")
+        # print("4: Apply Regex Cleanup to a text file") #NOTE: Not necessary for now, kind of trash... 
+        # print("5: Apply AI Repair to txt (Gemini)")
         print("Q: Quit")
         
         choice = input(">>> Your choice: ").lower()
@@ -201,12 +207,12 @@ def main():
         elif choice == '3':
             process_txt_workflow()
             break
-        elif choice == '4':
-            txt_path = prompt(">>> Enter path to .txt file: ", completer=path_completer)
-            clean_extracted_text(txt_path)
-        elif choice == '5':
-            txt_path = prompt(">>> Enter path to .txt file: ", completer=path_completer)
-            fix_text_with_ai(txt_path)
+        # elif choice == '4':
+        #     txt_path = prompt(">>> Enter path to .txt file: ", completer=path_completer)
+        #     clean_extracted_text(txt_path)
+        # elif choice == '5':
+        #     txt_path = prompt(">>> Enter path to .txt file: ", completer=path_completer)
+        #     fix_text_with_ai(txt_path)
         elif choice == 'q':
             break
         else:

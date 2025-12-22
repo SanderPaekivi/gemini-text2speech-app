@@ -4,6 +4,7 @@ import sys
 import glob
 import platform
 import subprocess
+import difflib
 
 def get_unique_filename(path):
     # Checks if filename exists, appends number if it does
@@ -69,3 +70,39 @@ def stitch_and_save_partial_audio(temp_dir_path, original_output_filename):
 def calculate_tts_cost(character_count, price_per_million_chars):
     # Calculates the estimated cost for a given number of characters
     return (character_count / 1_000_000) * price_per_million_chars
+
+def smart_stitch(previous_text, new_text, search_window=4000):
+    # Stitches two texts using word-based matching to ignore whitespace/formatting differences
+    if not previous_text:
+        return new_text
+
+    tail = previous_text[-search_window:]
+    head = new_text[:search_window]
+
+    def tokenize_with_indices(text):
+        tokens = []
+        for m in re.finditer(r'\S+', text):
+            tokens.append({
+                "word": m.group(0),
+                "start": m.start(),
+                "end": m.end()
+            })
+        return tokens
+
+    tail_tokens = tokenize_with_indices(tail)
+    head_tokens = tokenize_with_indices(head)
+    
+    tail_words = [t["word"] for t in tail_tokens]
+    head_words = [t["word"] for t in head_tokens]
+
+    matcher = difflib.SequenceMatcher(None, tail_words, head_words)
+    match = matcher.find_longest_match(0, len(tail_words), 0, len(head_words))
+
+    if match.size > 10:
+        print(f"    [Stitch] Found overlap of {match.size} words.")
+        last_match_word_idx = match.b + match.size - 1
+        cut_char_index = head_tokens[last_match_word_idx]["end"]
+        return previous_text + new_text[cut_char_index:]
+    else:
+        print("    [Stitch] No overlap found. Appending with newline.")
+        return previous_text + "\n" + new_text
