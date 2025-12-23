@@ -3,7 +3,7 @@ import pymupdf
 from tqdm import tqdm
 from collections import defaultdict
 
-from utility_functions import reduce_text_numerics, is_likely_heading, clean_common_pdf_artifacts, load_custom_fixes_from_file
+from utility_functions import reduce_text_numerics, is_likely_heading, clean_common_pdf_artifacts, load_custom_fixes_from_file, is_list_item
 
 DEFAULT_FIXES = {
     "! ®": "",
@@ -98,9 +98,16 @@ def extract_and_clean_pdf_text(pdf_path, start_page_index=0, end_page_index=None
                 continue
             
             # Skip lone page numbers at bottom
+            # is_last_block = (index == len(blocks) - 1)
+            # if is_last_block and stripped_block_text.startswith(tuple(str(n) for n in range(10))):
+            #     continue
+            # Only delete if it starts with a number AND is short (e.g. < 10 chars)
+            # This allows "1. Large issues..." (len 200+) to pass, but deletes "341" (len 3).
             is_last_block = (index == len(blocks) - 1)
-            if is_last_block and stripped_block_text.startswith(tuple(str(n) for n in range(10))):
-                continue
+            if is_last_block and stripped_block_text[0].isdigit():
+                # Check length! Page numbers are rarely longer than 4-5 digits/chars
+                if len(stripped_block_text) < 10:
+                    continue
             
             if any(keyword.lower() in stripped_block_text.lower() for keyword in skippable_keywords):
                 continue
@@ -140,6 +147,14 @@ def extract_and_clean_pdf_text(pdf_path, start_page_index=0, end_page_index=None
                         # independent new heading
                         marked_text = f" <<<HEADING>>>{clean_line}<<<END_HEADING>>> "
                         full_text_parts.append(marked_text)
+                elif is_list_item(clean_line):
+                    # Remove bullet symbol (•, -, or other) to standardize later
+                    # This regex should remove start symbol and any surrounding whitespace
+                    content = re.sub(r'^\s*[•●\-\*]\s*', '', clean_line)
+                    
+                    # Wraps in tags to protect from being merged into a paragraph
+                    marked_text = f" <<<LIST_ITEM>>>{content}<<<END_LIST_ITEM>>> "
+                    full_text_parts.append(marked_text)
                 
                 else:
                     # its normal text
@@ -165,6 +180,11 @@ def extract_and_clean_pdf_text(pdf_path, start_page_index=0, end_page_index=None
     # This must be done AFTER space collapse, so these newlines survive
     text = text.replace("<<<HEADING>>>", "\n\n")
     text = text.replace("<<<END_HEADING>>>", "\n\n")
+
+    # lists -> newline + dash
+    # ensure items are separated and paused correctly in TTS
+    text = text.replace(" <<<LIST_ITEM>>>", "\n- ")
+    text = text.replace("<<<END_LIST_ITEM>>> ", "")
 
     # 6. Citation removal
     text = re.sub(r'\([^)]*((?:19|20)\d{2}|et al\.|p\.|pp\.)[^)]*\)', '', text)

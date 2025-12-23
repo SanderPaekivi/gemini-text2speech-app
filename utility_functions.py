@@ -114,11 +114,21 @@ def is_likely_heading(text):
         return False
         
     # Checking length, headings are rarely long
-    if len(text) > 150:
+    if len(text) > 200:
         return False
+    
+    # Matches "III.", "IV:", "VI " followed by a capital letter.
+    # regex explanation:
+    # ^           : Start of string
+    # [IVXLCDM]+  : One or more Roman numeral characters (uppercase)
+    # \s*[:.]     : Optional space, then MANDATORY punctuation (dot or colon) to avoid matching words like "I" or "MIX"
+    # \s+         : Space
+    # [A-Z]       : Followed by a capital letter (The title text)
+    if re.match(r'^[IVXLCDM]+\s*[:.]\s+[A-Z]', text):
+        return True
 
     # Matches standard keywords like "Chapter 1", "Section IV", "3. Results", "Appendix A"
-    if re.match(r'^(?:chapter|section|part|appendix|figure|table)\s+[a-zA-Z0-9]+', text, re.IGNORECASE):
+    if re.match(r'^(?:chapter|section|part|appendix|figure|table)\s+\w+', text, re.IGNORECASE):
         return True
     
     # Looks for numbered sections like "1. Introduction" or "2.3 Methodology"
@@ -192,3 +202,29 @@ def load_custom_fixes_from_file(file_path):
         print(f"!!! Error parsing custom fixes file: {e}")
         print("Ensure the file contains a valid Python dictionary structure like {'bad': 'good'}.")
         return {}
+    
+def is_list_item(text):
+    # Check if item is a list, must start with bullet + SPACE or something like that.
+    # The \s+ ensures "-word" is ignored, but "- Word" is caught, so hyphenation still works...
+    match = re.match(r'^\s*([•●\-\*])\s+(.*)', text)
+    
+    if match:
+        content = match.group(2) # text after bullet
+        
+        # Safety check for lowercase
+        # If a line starts with "- word" (dash, space, lowercase), it MIGHT be 
+        # a weirdly formatted clause like " - and then he died."
+        # A list item usually starts with a Capital letter or a number
+        # If the content starts with a lowercase letter, we treat it as 
+        # text flow/continuation, instead a bullet point.
+        if content and content[0].islower():
+            return False
+            
+        return True
+
+    # Check for numbered lists "1. " or "IV. "
+    # Must be followed by space.
+    if re.match(r'^\s*(?:\d+\.|[IVX]+\.)\s+[A-Z]', text):
+        return True
+        
+    return False
