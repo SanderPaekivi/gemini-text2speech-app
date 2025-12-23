@@ -3,12 +3,10 @@ from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
 
 from config import * 
-from utility_functions import get_unique_filename, open_file_for_editing, calculate_tts_cost
+from utility_functions import get_unique_filename, open_file_for_editing, calculate_tts_cost, load_custom_fixes_from_file
 from pdf_core_text_extractor import extract_and_clean_pdf_text
 from google_ai_tts_converter import text_to_speech_converter
 from pdf_AI_text_extractor import extract_text_with_gemini
-from text_postprocessing import clean_extracted_text
-from gemini_ai_text_postprocessor import fix_text_with_ai
 
 ##############################################################################################################################
 ##############################################################################################################################
@@ -104,9 +102,31 @@ def extract_pdf_only_workflow():
     if not os.path.exists(pdf_path):
         print(f"!!! Error: File not found at {pdf_path}")
         return
+    
+    start_input = input(">>> Start from Page number (default 1): ").strip()
+    if start_input.isdigit() and int(start_input) > 0:
+        start_page_index = int(start_input) - 1
+    else:
+        start_page_index = 0
+
+    end_input = input(">>> End at Page number (default: End of file): ").strip()
+    end_page_index = None
+    if end_input.isdigit() and int(end_input) > 0:
+        end_page_index = int(end_input)
+
+    fixes_path = prompt(">>> Path to custom replacements file (optional): ", completer=path_completer).strip()
+    user_fixes = {}
+    if fixes_path:
+        # If user typed something, try to load it
+        # If user just hit Enter, skip
+        user_fixes = load_custom_fixes_from_file(fixes_path)
 
     # Extract
-    clean_text = extract_and_clean_pdf_text(pdf_path)
+    # clean_text = extract_and_clean_pdf_text(pdf_path)
+    clean_text = extract_and_clean_pdf_text(pdf_path, 
+                                            start_page_index, 
+                                            end_page_index,
+                                            custom_replacements=user_fixes)
     if not clean_text: 
         return
 
@@ -198,8 +218,6 @@ def main():
         print("1: Process a new PDF file")
         print("2: AI Smart Extraction from PDF (Gemini)")
         print("3: Generate audio from an existing .txt file")
-        # print("4: Apply Regex Cleanup to a text file") #NOTE: Not necessary for now, kind of trash... 
-        # print("5: Apply AI Repair to txt (Gemini)")
         print("Q: Quit")
         
         choice = input(">>> Your choice: ").lower()
@@ -213,12 +231,6 @@ def main():
         elif choice == '3':
             process_txt_workflow()
             break
-        # elif choice == '4':
-        #     txt_path = prompt(">>> Enter path to .txt file: ", completer=path_completer)
-        #     clean_extracted_text(txt_path)
-        # elif choice == '5':
-        #     txt_path = prompt(">>> Enter path to .txt file: ", completer=path_completer)
-        #     fix_text_with_ai(txt_path)
         elif choice == 'q':
             break
         else:

@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import ast
 import glob
 import platform
 import subprocess
@@ -106,3 +107,88 @@ def smart_stitch(previous_text, new_text, search_window=4000):
     else:
         print("    [Stitch] No overlap found. Appending with newline.")
         return previous_text + "\n" + new_text
+    
+def is_likely_heading(text):
+    text = text.strip()
+    if not text:
+        return False
+        
+    # Checking length, headings are rarely long
+    if len(text) > 150:
+        return False
+
+    # Matches standard keywords like "Chapter 1", "Section IV", "3. Results", "Appendix A"
+    if re.match(r'^(?:chapter|section|part|appendix|figure|table)\s+[a-zA-Z0-9]+', text, re.IGNORECASE):
+        return True
+    
+    # Looks for numbered sections like "1. Introduction" or "2.3 Methodology"
+    # ^\d+          : Starts with a number (e.g., "4")
+    # (?:\.\d+)* : Optional repeating groups of ".Number" (e.g., ".1.1")
+    # \.?           : OPTIONAL trailing dot (Handles "4.1.1." AND "4.1.1")
+    # \s+           : Space
+    # [A-Z]         : Followed by a capital letter
+    if re.match(r'^\d+(?:\.\d+)*\.?\s+[A-Z]', text):
+        return True
+
+    # All caps check, some styles have headings so, allowing for some punctuation so stripping digits and spaces to check if the LETTERS are uppercase
+    clean_letters = re.sub(r'[^a-zA-Z]', '', text)
+    if len(clean_letters) > 3 and clean_letters.isupper():
+        return True
+
+    return False
+
+def clean_common_pdf_artifacts(text, custom_fixes=None):
+    # Scan for and removes specific PDF text layer corruption patterns, can add custom features here. 
+    if not text:
+        return text
+    
+    # Custom fixes, for my pdf now a superscript becomes "! ®" for example
+    if custom_fixes:
+        for target, replacement in custom_fixes.items():
+            text = text.replace(target, replacement)
+
+    # 2. Fix for question-mark+digit corruption, a common mapping error for superscript citations like '26'
+    # Matches any letter/paren/digit, followed by '?', then a digit
+    # Example: "1947)?6" -> "1947)" | "Daubert?6" -> "Daubert"
+    text = re.sub(r'(?<=[a-zA-Z0-9\)])\?\d+', '', text)
+
+    # 3. Fix for exclamation+digit or similar weird suffixes
+    # Matches: word followed immediately by '!' and a digit (if that ever happens)
+    text = re.sub(r'(?<=[a-zA-Z])!\d+', '', text)
+
+    return text
+
+def load_custom_fixes_from_file(file_path):
+    # Reads .txt file that should contain a Python dictionary of fixes and returns it as object
+    # Supports formats:
+    #   1. Raw Dict: { "a": "b" }
+    #   2. Variable assignment: MY_FIXES = { "a": "b" }
+    
+    if not os.path.exists(file_path):
+        print(f"!!! Warning: Custom fixes file not found at '{file_path}'. Ignoring.")
+        return {}
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+        
+        # If  user included some name like "CUSTOM_FIXES =" at the start, strip it
+        if "=" in content:
+            # split on first '=' and take the second part, should be the dict... NOTE: Am I overcomplicating?
+            _, content = content.split("=", 1)
+            content = content.strip()
+            
+        # evaluate string as a Python dict
+        fixes = ast.literal_eval(content)
+        
+        if isinstance(fixes, dict):
+            print(f"Loaded {len(fixes)} custom replacement rules.")
+            return fixes
+        else:
+            print("!!! Error: The file content did not evaluate to a dictionary.")
+            return {}
+
+    except Exception as e:
+        print(f"!!! Error parsing custom fixes file: {e}")
+        print("Ensure the file contains a valid Python dictionary structure like {'bad': 'good'}.")
+        return {}
