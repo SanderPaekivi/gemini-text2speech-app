@@ -199,3 +199,6 @@ cython_debug/
 google-credentials.json
 *.mp3
 *.pdf
+*.epub
+*.txt
+!requirements.txt

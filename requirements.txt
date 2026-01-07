@@ -4,3 +4,4 @@ prompt-toolkit
 tqdm
 dotenv
 google-genai
+EbookLib
