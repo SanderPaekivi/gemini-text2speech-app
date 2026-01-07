@@ -35,3 +35,4 @@ INITIAL_BACKOFF = 2  # unit in seconds
 # File Paths
 TEXT_OUTPUT_FOLDER = "extracted_texts"
 AUDIO_OUTPUT_FOLDER = "generated_audio"
+EPUB_OUTPUT_FOLDER = "EPUB_Output"

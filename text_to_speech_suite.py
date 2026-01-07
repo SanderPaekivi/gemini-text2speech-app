@@ -7,6 +7,7 @@ from utility_functions import get_unique_filename, open_file_for_editing, calcul
 from pdf_core_text_extractor import extract_and_clean_pdf_text
 from google_ai_tts_converter import text_to_speech_converter
 from pdf_AI_text_extractor import extract_text_with_gemini
+from epub_creator import create_epub_from_text
 
 ##############################################################################################################################
 ##############################################################################################################################
@@ -93,6 +94,8 @@ def process_pdf_workflow():
         except Exception as e:
             print(f"!!! Error during file handling or editing: {e} !!!")
 
+    handle_epub_generation(clean_text, pdf_path)
+
     generate_audio_from_text(clean_text, pdf_path)
 
 def extract_pdf_only_workflow():
@@ -170,6 +173,83 @@ def process_txt_workflow():
     except Exception as e:
         print(f"!!! Error reading text file: {e} !!!")
 
+def handle_epub_generation(text_content, source_path):
+    print("\n---------------------------------------------------------------")
+    print("                      EPUB EXPORT")
+    print("  Creates a .epub book optimized for Voice Dream / Apple Books.")
+    print("  Includes automatic Table of Contents based on document headings.")
+    print("---------------------------------------------------------------")
+    
+    do_epub = input(">>> Generate EPUB file? (y/N): ").lower()
+    
+    if do_epub == 'y':
+        # Suggest a filename
+        base_name = os.path.splitext(os.path.basename(source_path))[0]
+        
+        output_folder = EPUB_OUTPUT_FOLDER
+        os.makedirs(output_folder, exist_ok=True)
+        
+        epub_path = os.path.join(output_folder, f"{base_name}.epub")
+        epub_path = get_unique_filename(epub_path)
+        
+        create_epub_from_text(text_content, epub_path, title=base_name)
+
+def process_txt_to_epub_workflow():
+    path_completer = PathCompleter()
+    print("\n######################### Text to EPUB Converter ##############################")
+    print("#                                                                             #")
+    print("#  Converts a raw .txt file into a structured EPUB audiobook.                 #")
+    print("#  - Auto-detects chapters based on headings.                                 #")
+    print("#  - Creates a Table of Contents for easy navigation.                         #")
+    print("#                                                                             #")
+    print("###############################################################################\n")
+    
+    txt_path = prompt(">>> Enter the path to your .txt file: ", completer=path_completer)
+
+    if not os.path.exists(txt_path):
+        print(f"\n!!! Error: File does not exist at '{txt_path}' !!!")
+        return
+
+    try:
+        print(f"Reading text from '{txt_path}'...")
+        with open(txt_path, 'r', encoding='utf-8') as f:
+            text_content = f.read()
+        
+        # Ensure output directory exists
+        os.makedirs(EPUB_OUTPUT_FOLDER, exist_ok=True)
+        
+        # 1. Determine base name from source file
+        base_name = os.path.splitext(os.path.basename(txt_path))[0]
+        
+        # 2. Construct default full path in EPUB folder
+        default_filename = f"{base_name}.epub"
+        
+        # 3. Check for uniqueness, show user likely actual name
+        suggestion_path = os.path.join(EPUB_OUTPUT_FOLDER, default_filename)
+        unique_suggestion_path = get_unique_filename(suggestion_path)
+        unique_suggestion_name = os.path.basename(unique_suggestion_path)
+        
+        # 4. Ask for custom name or accept default
+        user_input = input(f">>> Enter output filename (default: {unique_suggestion_name}): ").strip()
+        
+        if not user_input:
+            final_output_path = unique_suggestion_path
+        else:
+            # If user typed a name, make sure it ends in .epub
+            if not user_input.lower().endswith('.epub'):
+                user_input += ".epub"
+            
+            # Combine user input with enforced folder
+            custom_path = os.path.join(EPUB_OUTPUT_FOLDER, user_input)
+            # Ensure custom path is also unique
+            final_output_path = get_unique_filename(custom_path)
+
+        # 5. Generate
+        create_epub_from_text(text_content, final_output_path, title=base_name)
+        
+    except Exception as e:
+        print(f"!!! Error processing file: {e} !!!")
+
 def generate_audio_from_text(text_content, source_path):
     # Method for prompting user and starting audio synthesis
     char_count = len(text_content)
@@ -218,6 +298,7 @@ def main():
         print("1: Process a new PDF file")
         print("2: AI Smart Extraction from PDF (Gemini)")
         print("3: Generate audio from an existing .txt file")
+        print("4: Generate EPUB from an existing .txt file")
         print("Q: Quit")
         
         choice = input(">>> Your choice: ").lower()
@@ -230,6 +311,9 @@ def main():
             break
         elif choice == '3':
             process_txt_workflow()
+            break
+        elif choice == '4':
+            process_txt_to_epub_workflow()
             break
         elif choice == 'q':
             break
